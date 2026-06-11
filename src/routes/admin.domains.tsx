@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtCurrency } from "@/lib/admin-utils";
+import { COUNTRIES, SUPPORTED_COUNTRIES, type CountryCode } from "@/lib/countries";
 
 export const Route = createFileRoute("/admin/domains")({
   component: AdminDomains,
@@ -28,6 +29,7 @@ type Domain = {
 };
 
 type DomainStats = { orders: number; rev: number };
+type SubdomainStat = { orders: number; paid: number; rev: number; byCountry: Record<string, { rev: number; symbol: string }> };
 
 const blankDomain = (): Omit<Domain, "id"> => ({
   domain: "",
@@ -51,8 +53,10 @@ const blankDomain = (): Omit<Domain, "id"> => ({
 type DomainProduct = { id: string; subdomain: string; product_name: string; active: boolean | null; root_domain: string | null };
 
 function AdminDomains() {
+  const router = useRouter();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [stats, setStats] = useState<Map<string, DomainStats>>(new Map());
+  const [subStats, setSubStats] = useState<Map<string, SubdomainStat>>(new Map());
   const [domainProducts, setDomainProducts] = useState<Map<string, DomainProduct[]>>(new Map());
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
   const [editing, setEditing] = useState<Domain | null>(null);
@@ -62,7 +66,7 @@ function AdminDomains() {
   const load = async () => {
     const [{ data: d }, { data: o }, { data: p }] = await Promise.all([
       supabase.from("domains" as any).select("*").order("created_at", { ascending: true }),
-      supabase.from("orders").select("source_domain,total,payment_status"),
+      supabase.from("orders").select("source_domain,total,payment_status,country_code,currency"),
       supabase.from("products").select("id,subdomain,product_name,active,root_domain").order("product_name"),
     ]);
     setDomains((d ?? []) as Domain[]);
@@ -75,15 +79,37 @@ function AdminDomains() {
     });
     setDomainProducts(pm);
 
+    // Aggregate by root domain for the table row summary
     const m = new Map<string, DomainStats>();
+    // Aggregate per full source_domain (subdomain.rootdomain.com) for the expanded analytics
+    const sm = new Map<string, SubdomainStat>();
+
     (o ?? []).forEach((r: any) => {
       const key = r.source_domain ?? "";
-      const v = m.get(key) ?? { orders: 0, rev: 0 };
+      // root domain stats
+      const rootKey = key.includes(".") ? key.split(".").slice(1).join(".") : key;
+      const v = m.get(rootKey) ?? { orders: 0, rev: 0 };
       v.orders++;
       if (r.payment_status === "paid") v.rev += r.total ?? 0;
-      m.set(key, v);
+      m.set(rootKey, v);
+
+      // per-subdomain stats keyed by full source_domain
+      const sv = sm.get(key) ?? { orders: 0, paid: 0, rev: 0, byCountry: {} };
+      sv.orders++;
+      if (r.payment_status === "paid") {
+        sv.paid++;
+        sv.rev += r.total ?? 0;
+        const cc = (r.country_code ?? "").toLowerCase() as CountryCode;
+        if (SUPPORTED_COUNTRIES.includes(cc)) {
+          const prev = sv.byCountry[cc] ?? { rev: 0, symbol: COUNTRIES[cc].currency_symbol };
+          prev.rev += r.total ?? 0;
+          sv.byCountry[cc] = prev;
+        }
+      }
+      sm.set(key, sv);
     });
     setStats(m);
+    setSubStats(sm);
     setLoading(false);
   };
 
@@ -157,59 +183,110 @@ function AdminDomains() {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr key={`${d.id}-products`} className="bg-blue-50 border-t">
-                      <td colSpan={7} className="px-4 py-3">
+                    <tr key={`${d.id}-analytics`} className="border-t">
+                      <td colSpan={7} className="px-4 py-4 bg-gray-50">
                         {prods.length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">No products assigned to this domain yet. Go to Products → Edit a product → set its domain to <strong>{d.domain}</strong>.</p>
+                          <p className="text-xs text-muted-foreground italic">No products assigned to this domain yet. Go to Products → assign domain to <strong>{d.domain}</strong>.</p>
                         ) : (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold text-blue-800 mb-2">Products assigned to {d.domain}</p>
-                            {prods.map((p) => (
-                              <div key={p.id} className="bg-white border border-blue-100 rounded-md px-3 py-2 flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-xs text-gray-900">{p.product_name}</span>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${p.active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                                    {p.active !== false ? "active" : "inactive"}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 gap-0.5 text-[10px] font-mono text-gray-500">
-                                  <span>Checkout (prod): <strong className="text-gray-800">{p.subdomain}.{d.domain}</strong></span>
-                                  <span>
-                                    Checkout (preview):&nbsp;
-                                    <a
-                                      href={`/?subdomain=${p.subdomain}&domain=${d.domain}&country=uk`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-blue-600 underline"
-                                    >
-                                      /?subdomain={p.subdomain}&domain={d.domain}&country=uk
-                                    </a>
-                                  </span>
-                                  <span>
-                                    Product detail:&nbsp;
-                                    <a
-                                      href={`/products/${p.subdomain}?domain=${d.domain}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-blue-600 underline"
-                                    >
-                                      /products/{p.subdomain}?domain={d.domain}
-                                    </a>
-                                  </span>
-                                  <span>
-                                    Main store:&nbsp;
-                                    <a
-                                      href={`/?domain=${d.domain}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-blue-600 underline"
-                                    >
-                                      /?domain={d.domain}
-                                    </a>
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
+                          <div className="space-y-3">
+                            {/* Domain summary bar */}
+                            <div className="flex items-center gap-6 bg-white border rounded-lg px-4 py-3">
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Domain Total</span>
+                              <StatChip label="Revenue" value={fmtCurrency(s.rev)} color="green" />
+                              <StatChip label="Orders" value={String(s.orders)} color="blue" />
+                              <StatChip label="Subdomains" value={String(prods.length)} color="gray" />
+                            </div>
+
+                            {/* Per-subdomain revenue cards */}
+                            <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+                              {prods.map((p) => {
+                                const fullKey = `${p.subdomain}.${d.domain}`;
+                                const ss = subStats.get(fullKey) ?? { orders: 0, paid: 0, rev: 0, byCountry: {} };
+                                const conv = ss.orders ? ((ss.paid / ss.orders) * 100).toFixed(1) : "0";
+                                const hasCountries = SUPPORTED_COUNTRIES.some((cc) => (ss.byCountry[cc]?.rev ?? 0) > 0);
+                                return (
+                                  <div key={p.id} className="bg-white border rounded-lg p-4">
+                                    {/* Header */}
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold text-sm text-gray-900">{p.product_name}</span>
+                                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${p.active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                                            {p.active !== false ? "active" : "inactive"}
+                                          </span>
+                                        </div>
+                                        <span className="text-[11px] font-mono text-gray-400">{fullKey}</span>
+                                      </div>
+                                      <div className="flex gap-1.5">
+                                        <button
+                                          onClick={() => router.navigate({ to: "/admin/orders", search: { domain: fullKey } })}
+                                          className="text-[11px] border rounded px-2 py-1 hover:bg-gray-50"
+                                        >Orders</button>
+                                        <button
+                                          onClick={() => router.navigate({ to: "/admin/settings", search: { subdomain: p.subdomain } })}
+                                          className="text-[11px] bg-blue-600 text-white rounded px-2 py-1"
+                                        >Settings</button>
+                                      </div>
+                                    </div>
+
+                                    {/* Revenue stats row */}
+                                    <div className="grid grid-cols-3 gap-2 mb-3">
+                                      <div className="bg-green-50 rounded-md px-3 py-2 text-center">
+                                        <div className="text-xs text-green-700 font-semibold">{fmtCurrency(ss.rev)}</div>
+                                        <div className="text-[10px] text-green-600">Revenue</div>
+                                      </div>
+                                      <div className="bg-blue-50 rounded-md px-3 py-2 text-center">
+                                        <div className="text-xs text-blue-700 font-semibold">{ss.orders}</div>
+                                        <div className="text-[10px] text-blue-600">Orders</div>
+                                      </div>
+                                      <div className="bg-purple-50 rounded-md px-3 py-2 text-center">
+                                        <div className="text-xs text-purple-700 font-semibold">{conv}%</div>
+                                        <div className="text-[10px] text-purple-600">Conversion</div>
+                                      </div>
+                                    </div>
+
+                                    {/* Country breakdown */}
+                                    {hasCountries ? (
+                                      <div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Revenue by Country</div>
+                                        <div className="space-y-1">
+                                          {SUPPORTED_COUNTRIES.filter((cc) => (ss.byCountry[cc]?.rev ?? 0) > 0)
+                                            .sort((a, b) => ss.byCountry[b].rev - ss.byCountry[a].rev)
+                                            .map((cc) => {
+                                              const c = COUNTRIES[cc];
+                                              const bc = ss.byCountry[cc];
+                                              const pct = ss.rev > 0 ? (bc.rev / ss.rev) * 100 : 0;
+                                              return (
+                                                <div key={cc} className="flex items-center gap-2">
+                                                  <span className="text-base leading-none">{c.flag}</span>
+                                                  <span className="text-xs text-gray-600 w-28">{c.name}</span>
+                                                  <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                                  </div>
+                                                  <span className="text-xs font-semibold text-gray-800 w-16 text-right">{bc.symbol}{bc.rev.toFixed(0)}</span>
+                                                  <span className="text-[10px] text-gray-400 w-10 text-right">{pct.toFixed(0)}%</span>
+                                                </div>
+                                              );
+                                            })}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-gray-400 italic">No paid orders yet for this subdomain.</div>
+                                    )}
+
+                                    {/* Preview links */}
+                                    <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                                      <a href={`/?subdomain=${p.subdomain}&domain=${d.domain}&country=uk`} target="_blank" rel="noreferrer"
+                                        className="text-[10px] font-mono text-blue-600 underline">Preview ↗</a>
+                                      <a href={`/products/${p.subdomain}?domain=${d.domain}`} target="_blank" rel="noreferrer"
+                                        className="text-[10px] font-mono text-blue-600 underline">Product page ↗</a>
+                                      <a href={`/?domain=${d.domain}`} target="_blank" rel="noreferrer"
+                                        className="text-[10px] font-mono text-blue-600 underline">Store ↗</a>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </td>
@@ -339,6 +416,18 @@ function DomainForm({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatChip({ label, value, color }: { label: string; value: string; color: "green" | "blue" | "gray" }) {
+  const cls = color === "green" ? "bg-green-50 text-green-700"
+    : color === "blue" ? "bg-blue-50 text-blue-700"
+    : "bg-gray-100 text-gray-600";
+  return (
+    <div className={`flex items-center gap-2 rounded-md px-3 py-1.5 ${cls}`}>
+      <span className="text-xs font-bold">{value}</span>
+      <span className="text-[10px] uppercase tracking-wide opacity-70">{label}</span>
     </div>
   );
 }
