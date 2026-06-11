@@ -1,0 +1,4 @@
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS price_4 numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS label_4 text,
+  ADD COLUMN IF NOT EXISTS colors jsonb NOT NULL DEFAULT '[]'::jsonb;
