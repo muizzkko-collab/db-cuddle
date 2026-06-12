@@ -21,9 +21,25 @@ export const Route = createFileRoute("/")({
   component: RootRouter,
 });
 
-const CARD_PASTELS = ["#FCEAE8","#EAE6F8","#E0EDF8","#DFF0E8","#F5E0EE","#F8F0DC","#E8F0E8","#F0E8F4"];
-const MARQUEE_TRUST = ["2-YEAR WARRANTY INCLUDED","WORLDWIDE DELIVERY","SAME-DAY DISPATCH BEFORE 3PM","VERIFIED-MERCHANT PROGRAM","FREE SHIPPING OVER £40","30-DAY MONEY-BACK"];
-const CATEGORIES = ["All","Wellness","Recovery","Tech","Home","Beauty","Fitness","Audio"];
+const CARD_TINTS = [
+  { tint: "#FBE4DC", ink: "#2A1410" },
+  { tint: "#E8DFFF", ink: "#1E1640" },
+  { tint: "#DBEEF6", ink: "#0E2A3A" },
+  { tint: "#DCEEDC", ink: "#0F2E1C" },
+  { tint: "#F6E2EC", ink: "#3A1024" },
+  { tint: "#FFF1C2", ink: "#3A2B05" },
+  { tint: "#E2E6EE", ink: "#161C28" },
+  { tint: "#E5E5E5", ink: "#1A1A1A" },
+];
+const MARQUEE_ITEMS = [
+  "Free shipping over £40",
+  "30-day money-back",
+  "2-year warranty included",
+  "Worldwide delivery",
+  "Same-day dispatch before 3pm",
+  "Verified-merchant program",
+];
+const CATEGORIES = ["All", "Wellness", "Recovery", "Outdoor", "Fitness", "Beauty", "Audio", "Home", "Work", "EDC"];
 
 function RootRouter() {
   const [subdomain, setSubdomain] = useState<string | null>(null);
@@ -133,11 +149,9 @@ function useCountdown(initialSeconds: number) {
 }
 
 function MainStore() {
-  const { company_name, rootDomain } = useDomain();
+  const { rootDomain } = useDomain();
   const { addItem, openCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
-  const [email, setEmail] = useState("");
-  const [newsletterSent, setNewsletterSent] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const countdown = useCountdown(9589);
 
@@ -163,305 +177,525 @@ function MainStore() {
     openCart();
   };
 
-  const submitNewsletter = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    await supabase.from("newsletter_signups" as any).insert({ email: email.trim(), root_domain: rootDomain });
-    setNewsletterSent(true);
-    setEmail("");
-  };
-
-  const shelfProducts = useMemo(() => products.slice(0, 8), [products]);
+  const carouselProducts = useMemo(() => products.slice(0, 6), [products]);
+  const shelfProducts = useMemo(() => products, [products]);
 
   return (
     <SiteLayout>
       <style>{`
-        :root {
-          --co-bg: #FAF7F0;
-          --co-ink: #1A1A1A;
-          --co-ink-2: #555;
-          --co-ink-3: #999;
-          --co-yellow: #F5C242;
-          --co-hair: #E8E4DC;
-          --co-surface: #fff;
-          --co-serif: 'Instrument Serif', Georgia, serif;
+        /* ---- Page-level overrides ---- */
+        main { padding: 0 44px; }
+        @keyframes co-pg-marquee { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
+
+        /* ---- Promo + marquee ---- */
+        .promo-bar {
+          height: 38px;
+          display: flex; align-items: center; justify-content: center;
+          gap: 10px; font-size: 13px; letter-spacing: 0.02em; font-weight: 500;
         }
-        body, .ch-store { background: var(--co-bg) !important; }
-        @keyframes co-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .co-marquee { animation: co-marquee 28s linear infinite; display: flex; gap: 0; white-space: nowrap; }
-        .co-card:hover .co-checkout-btn { opacity: 1 !important; transform: translateY(0) !important; }
-        .co-pill-btn { background: #1A1A1A; color: #fff; border-radius: 999px; padding: 14px 24px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background .2s; }
-        .co-pill-btn:hover { background: #333; }
-        .co-pill-btn.yellow { background: var(--co-yellow); color: #1A1A1A; }
-        .co-pill-btn.yellow:hover { background: #e0b030; }
-        .co-cat-pill { background: transparent; border: 1px solid var(--co-hair); border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--co-ink-2); transition: all .15s; }
-        .co-cat-pill.active { background: var(--co-ink); color: #fff; border-color: var(--co-ink); }
-        .co-cat-pill:hover:not(.active) { border-color: #aaa; color: var(--co-ink); }
+        .promo-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .promo-sep { opacity: 0.4; }
+        .pg-marquee {
+          background: var(--accent);
+          color: #141414;
+          border-top: 1px solid rgba(0,0,0,0.08);
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+          overflow: hidden; height: 36px;
+          display: flex; align-items: center;
+          margin: 0 -44px;
+        }
+        .pg-marquee-track {
+          display: flex; gap: 36px; white-space: nowrap;
+          animation: co-pg-marquee 38s linear infinite;
+          padding-left: 36px;
+          font-weight: 600; font-size: 13px;
+          letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        .pg-marquee-item { display: inline-flex; align-items: center; gap: 14px; }
+        .pg-marquee-bullet { font-size: 10px; opacity: 0.6; }
+
+        /* ---- Hero ---- */
+        .hero {
+          padding: 24px 0 56px;
+          text-align: center;
+          display: flex; flex-direction: column; align-items: center;
+        }
+        .hero-rating {
+          display: inline-flex; align-items: center; gap: 12px;
+          font-size: 13px; color: var(--muted);
+        }
+        .hero-avatars { display: inline-flex; }
+        .hero-avatars span {
+          display: inline-block; width: 24px; height: 24px;
+          border-radius: 50%; border: 2px solid var(--bg);
+          margin-left: -8px;
+        }
+        .hero-avatars span:first-child { margin-left: 0; }
+        .hero-stars { color: #F5B400; display: inline-flex; }
+        .hero-rating-meta { display: inline-flex; gap: 6px; align-items: baseline; }
+        .hero-rating-meta strong { color: var(--ink); font-weight: 600; }
+        .hero-headline {
+          font-family: 'Instrument Serif', serif;
+          font-weight: 400;
+          font-size: clamp(64px, 8.8vw, 132px);
+          line-height: 0.94;
+          letter-spacing: -0.025em;
+          margin: 18px 0 22px;
+        }
+        .hero-headline em { font-style: italic; font-weight: 400; }
+        .hero-sub {
+          font-size: 17px; line-height: 1.45;
+          max-width: 460px; color: var(--muted);
+          margin: 0 auto 28px;
+        }
+        .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .btn {
+          display: inline-flex; align-items: center; gap: 10px;
+          padding: 14px 22px; border-radius: 999px;
+          font-size: 15px; font-weight: 600;
+          border: 1px solid transparent;
+          transition: transform 150ms, box-shadow 150ms;
+          cursor: pointer;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: var(--accent); color: var(--ink); }
+        .btn-ghost { border-color: var(--line); color: var(--ink); background: transparent; }
+        .btn-ghost:hover { background: rgba(0,0,0,0.04); }
+        .hero-promises {
+          list-style: none; padding: 0;
+          margin: 26px 0 0;
+          display: flex; flex-wrap: wrap; gap: 20px;
+          font-size: 13.5px; color: var(--muted);
+          justify-content: center;
+        }
+        .hero-promises li { display: inline-flex; align-items: center; gap: 8px; }
+        .promise-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+        .hero-carousel {
+          margin-top: 52px;
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 14px;
+          width: 100%;
+        }
+        .hero-carousel-card {
+          aspect-ratio: 3 / 4;
+          border-radius: 18px;
+          padding: 14px;
+          display: flex; flex-direction: column; justify-content: space-between;
+          text-align: left;
+          transition: transform 250ms;
+          cursor: pointer;
+        }
+        .hero-carousel-card:hover { transform: translateY(-6px) !important; }
+        .hero-carousel-card-icon {
+          flex: 1;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .hero-carousel-name {
+          font-family: 'Instrument Serif', serif;
+          font-size: 17px; line-height: 1.05; letter-spacing: -0.01em;
+        }
+
+        /* ---- Trust row ---- */
+        .trust-row {
+          display: grid; grid-template-columns: repeat(4, 1fr);
+          border-top: 1px solid var(--line);
+          border-bottom: 1px solid var(--line);
+          margin: 28px 0;
+        }
+        .trust-item {
+          padding: 22px 24px;
+          border-right: 1px solid var(--line);
+          display: flex; align-items: center; gap: 16px;
+        }
+        .trust-item:last-child { border-right: none; }
+        .trust-icon {
+          width: 44px; height: 44px; border-radius: 12px;
+          background: rgba(0,0,0,0.06);
+          display: inline-flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+        }
+        .trust-item:first-child .trust-icon { background: rgba(0,0,0,0.12); }
+        .trust-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .trust-k {
+          font-family: 'Instrument Serif', serif;
+          font-size: 28px; letter-spacing: -0.02em; line-height: 1;
+        }
+        .trust-v { font-size: 13px; line-height: 1.3; color: var(--muted); }
+        .trust-item:first-child .trust-v { color: var(--ink); }
+
+        /* ---- Grid section ---- */
+        .grid-section { padding: 56px 0 64px; }
+        .grid-header {
+          display: grid; grid-template-columns: 1.2fr 1fr;
+          gap: 40px; align-items: end; margin-bottom: 36px;
+        }
+        .eyebrow {
+          font-size: 12px; letter-spacing: 0.12em;
+          text-transform: uppercase; font-weight: 600; color: var(--muted);
+        }
+        .section-title {
+          font-family: 'Instrument Serif', serif;
+          font-weight: 400;
+          font-size: clamp(40px, 5vw, 68px);
+          line-height: 0.96; letter-spacing: -0.02em;
+          margin: 8px 0 0;
+        }
+        .grid-intro { font-size: 15.5px; line-height: 1.5; max-width: 460px; margin: 0; color: var(--muted); }
+        .category-strip {
+          display: flex; justify-content: space-between; align-items: center;
+          gap: 16px; padding: 16px 0; margin-bottom: 24px;
+          border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+          flex-wrap: wrap;
+        }
+        .category-strip-inner { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip {
+          padding: 8px 14px; border-radius: 999px;
+          font-size: 13px; font-weight: 500;
+          border: 1px solid transparent;
+          transition: background 150ms, color 150ms;
+          cursor: pointer; background: transparent;
+        }
+        .chip:hover { background: rgba(0,0,0,0.04); }
+        .chip-active { background: var(--ink); color: var(--bg); font-weight: 600; }
+        .chip-active:hover { background: var(--ink); opacity: 0.9; }
+        .chip-inactive { border-color: var(--line); color: var(--muted); }
+        .category-sort { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+        .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .grid-footer { display: flex; justify-content: center; margin-top: 40px; }
+        .link-arrow {
+          display: inline-flex; align-items: center; gap: 10px;
+          padding: 14px 22px; border-radius: 999px;
+          border: 1px solid var(--line); font-size: 14.5px; font-weight: 600;
+          transition: background 150ms; color: var(--ink);
+        }
+        .link-arrow:hover { background: rgba(0,0,0,0.04); }
+
+        /* ---- Product card ---- */
+        .product-card {
+          border-radius: 22px; padding: 14px;
+          display: flex; flex-direction: column; gap: 14px;
+          transition: transform 200ms ease, box-shadow 200ms ease;
+          position: relative; overflow: hidden;
+          text-decoration: none; color: inherit;
+        }
+        .product-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 40px -28px rgba(0,0,0,0.3);
+        }
+        .product-media {
+          position: relative; aspect-ratio: 1 / 1;
+          border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(255,255,255,0.35);
+        }
+        .product-tag {
+          position: absolute; top: 10px; left: 10px;
+          font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+          font-weight: 600; padding: 4px 8px;
+          background: rgba(0,0,0,0.06); border-radius: 999px;
+        }
+        .product-off {
+          position: absolute; top: 10px; right: 10px;
+          font-size: 11px; font-weight: 700; padding: 4px 8px;
+          background: rgba(0,0,0,0.85); color: #fff; border-radius: 999px;
+        }
+        .product-icon-wrap {
+          width: 70%; height: 70%;
+          display: flex; align-items: center; justify-content: center;
+          transition: transform 300ms;
+        }
+        .product-card:hover .product-icon-wrap { transform: scale(1.05) rotate(-2deg); }
+        .product-meta { display: flex; flex-direction: column; gap: 4px; padding: 0 4px; }
+        .product-name {
+          font-family: 'Instrument Serif', serif;
+          font-size: 22px; line-height: 1.02; letter-spacing: -0.015em;
+        }
+        .product-price-row { display: flex; align-items: baseline; gap: 8px; }
+        .product-price { font-size: 15px; font-weight: 600; }
+        .product-was { font-size: 12.5px; text-decoration: line-through; opacity: 0.5; }
+        .product-cta {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px; border-radius: 999px;
+          font-size: 13px; font-weight: 600; color: #141414;
+          background: var(--accent);
+          transition: filter 150ms;
+        }
+        .product-card:hover .product-cta { filter: brightness(0.95); }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 1100px) {
+          .product-grid { grid-template-columns: repeat(3, 1fr); }
+          .hero-carousel { grid-template-columns: repeat(3, 1fr); }
+          .grid-header { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+          main { padding: 0 20px; }
+          .pg-marquee { margin: 0 -20px; }
+          .product-grid { grid-template-columns: repeat(2, 1fr); }
+          .trust-row { grid-template-columns: repeat(2, 1fr); }
+          .trust-item:nth-child(2n) { border-right: none; }
+        }
       `}</style>
 
-      {/* ANNOUNCEMENT BAR */}
-      <div style={{ background: "#141414", color: "#fff", fontSize: 12, padding: "9px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, fontWeight: 500 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5A623", display: "inline-block" }} />
-          End-of-season clearance — up to 60% off
-        </span>
-        <span style={{ opacity: 0.4 }}>|</span>
+      {/* PROMO BAR */}
+      <div className="promo-bar" style={{ background: "var(--strip-bg)", color: "var(--strip-ink)" }}>
+        <span className="promo-dot" style={{ background: "var(--accent)" }} />
+        <span>End-of-season clearance — up to <strong>60% off</strong></span>
+        <span className="promo-sep">·</span>
         <span>Ends in <strong style={{ fontVariantNumeric: "tabular-nums" }}>{countdown}</strong></span>
       </div>
 
-      {/* SCROLLING TRUST MARQUEE */}
-      <div style={{ background: "#1F1C17", color: "#aaa", fontSize: 11, padding: "8px 0", overflow: "hidden", letterSpacing: "0.1em" }}>
-        <div className="co-marquee">
-          {[0, 1].map((r) => (
-            <span key={r} style={{ display: "inline-flex", gap: 0 }} aria-hidden={r === 1}>
-              {MARQUEE_TRUST.map((item) => (
-                <span key={item} style={{ display: "inline-flex", alignItems: "center" }}>
-                  <span style={{ padding: "0 20px" }}>{item}</span>
-                  <span style={{ opacity: 0.4 }}>+</span>
-                </span>
-              ))}
+      {/* MARQUEE — yellow bg, uppercase */}
+      <div className="pg-marquee">
+        <div className="pg-marquee-track">
+          {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((m, i) => (
+            <span key={i} className="pg-marquee-item">
+              <span className="pg-marquee-bullet">✦</span>
+              {m}
             </span>
           ))}
         </div>
       </div>
 
-      {/* HERO */}
-      <section style={{ background: "var(--co-bg)", padding: "72px 40px 56px", textAlign: "center" }}>
-        {/* Avatar dots */}
-        <div style={{ display: "flex", justifyContent: "center", gap: -8, marginBottom: 14 }}>
-          {["#FCEAE8","#EAE6F8","#E0EDF8","#DFF0E8","#F5E0EE"].map((c, i) => (
-            <div key={i} style={{ width: 36, height: 36, borderRadius: "50%", background: c, border: "2px solid var(--co-bg)", marginLeft: i === 0 ? 0 : -10, zIndex: 5 - i, position: "relative" }} />
-          ))}
-        </div>
-        {/* Rating */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, color: "var(--co-ink-2)", marginBottom: 28 }}>
-          <span style={{ color: "#F5C242", letterSpacing: 2 }}>★★★★★</span>
-          <strong style={{ color: "var(--co-ink)" }}>4.8</strong>
-          <span style={{ opacity: 0.5 }}>·</span>
-          <span>12,480 verified reviews</span>
+      {/* HERO — centered layout */}
+      <section className="hero">
+        {/* Rating block */}
+        <div className="hero-rating">
+          <div className="hero-avatars">
+            {[{ bg: "#E8C9B5" }, { bg: "#B8C7E8" }, { bg: "#D6BCE0" }, { bg: "#C7E0BC" }].map((a, i) => (
+              <span key={i} style={{ background: a.bg }} />
+            ))}
+          </div>
+          <div className="hero-stars">
+            <svg width="78" height="14" viewBox="0 0 78 14"><g fill="#F5B400">
+              {[0,1,2,3,4].map((i) => (
+                <path key={i} transform={`translate(${i * 16} 0)`} d="M7 0 L8.6 4.6 L13.5 4.6 L9.6 7.6 L11 12.4 L7 9.5 L3 12.4 L4.4 7.6 L0.5 4.6 L5.4 4.6 Z" />
+              ))}
+            </g></svg>
+          </div>
+          <div className="hero-rating-meta">
+            <strong>4.8</strong>
+            <span>· 12,480 verified reviews</span>
+          </div>
         </div>
 
-        {/* HERO HEADING */}
-        <h1 style={{ fontFamily: "'Manrope', -apple-system, sans-serif", fontWeight: 800, fontSize: "clamp(48px, 7.5vw, 96px)", lineHeight: 1.05, letterSpacing: "-0.025em", color: "var(--co-ink)", margin: "0 auto 24px", maxWidth: 900 }}>
-          The good stuff,{" "}
-          <em style={{ fontStyle: "italic", fontWeight: 800 }}>checked out</em>{" "}
-          fast.
+        {/* Headline */}
+        <h1 className="hero-headline">
+          The good stuff,<br />
+          <em>checked out</em> fast.
         </h1>
 
-        <p style={{ fontSize: 16, color: "var(--co-ink-2)", margin: "0 auto 36px", maxWidth: 420, lineHeight: 1.55 }}>
-          Hand-picked products at sharp prices. Free shipping over £40.<br />
-          Thirty-day money-back, no questions.
+        <p className="hero-sub">
+          Hand-picked gadgets at sharp prices. Free shipping over £40. Thirty-day money-back, no questions.
         </p>
 
         {/* CTAs */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div className="hero-ctas">
           <Link to="/shop">
-            <button className="co-pill-btn yellow">Shop everything →</button>
+            <button className="btn btn-primary">
+              Shop everything
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 L19 12 M13 6 L19 12 L13 18" /></svg>
+            </button>
           </Link>
-          <Link to="/shop" style={{ fontSize: 14, fontWeight: 600, color: "var(--co-ink)", textDecoration: "underline", textUnderlineOffset: 3 }}>
-            Best sellers
+          <Link to="/shop">
+            <button className="btn btn-ghost">Best sellers</button>
           </Link>
         </div>
 
-        {/* Trust bullets */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 28, fontSize: 13, color: "var(--co-ink-3)" }}>
-          {["Free shipping £40+", "30-day returns", "2-year warranty"].map((t) => (
-            <span key={t} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--co-yellow)", display: "inline-block" }} />
-              {t}
-            </span>
-          ))}
+        {/* Promises */}
+        <ul className="hero-promises">
+          <li><span className="promise-dot" />Free shipping £40+</li>
+          <li><span className="promise-dot" />30-day returns</li>
+          <li><span className="promise-dot" />2-year warranty</li>
+        </ul>
+
+        {/* Hero carousel */}
+        <div className="hero-carousel">
+          {(carouselProducts.length > 0 ? carouselProducts : Array(6).fill(null)).map((p, i) => {
+            const tint = CARD_TINTS[i % CARD_TINTS.length];
+            return (
+              <div
+                key={p?.id ?? i}
+                className="hero-carousel-card"
+                style={{
+                  background: tint.tint,
+                  color: tint.ink,
+                  transform: `translateY(${i % 2 ? 12 : -12}px) rotate(${(i - 2.5) * 1.5}deg)`,
+                }}
+                onClick={p ? () => handleAdd(p) : undefined}
+              >
+                <div className="hero-carousel-card-icon">
+                  {p?.image_url ? (
+                    <img src={p.image_url} alt={p.product_name} style={{ width: "55%", height: "55%", objectFit: "contain" }} />
+                  ) : (
+                    <svg viewBox="0 0 100 100" style={{ width: "55%", height: "55%", stroke: tint.ink, fill: "none", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" }}>
+                      <rect x="26" y="36" width="48" height="32" rx="4" />
+                      <circle cx="50" cy="52" r="9" />
+                      <circle cx="50" cy="52" r="4" />
+                    </svg>
+                  )}
+                </div>
+                <div className="hero-carousel-name">{p?.product_name ?? "Coming soon"}</div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* HORIZONTAL PRODUCT CAROUSEL */}
-      <section style={{ padding: "0 0 64px", overflow: "hidden" }}>
-        <div style={{ display: "flex", gap: 16, padding: "0 40px", overflowX: "auto", scrollSnapType: "x mandatory", scrollbarWidth: "none" }}>
-          {(products.length > 0 ? products : Array(6).fill(null)).map((p, idx) => (
-            <CheckoutrCard key={p?.id ?? idx} product={p} index={idx} onAdd={p ? () => handleAdd(p) : () => {}} />
-          ))}
-        </div>
-      </section>
-
-      {/* TRUST STRIP */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", borderTop: "1px solid var(--co-hair)", borderBottom: "1px solid var(--co-hair)" }}>
+      {/* TRUST ROW */}
+      <section className="trust-row">
         {[
-          { icon: "★", val: "4.8★", sub: "across 12,480 reviews", yellow: true },
-          { icon: "↩", val: "30-day", sub: "no-questions returns" },
-          { icon: "◎", val: "2-yr", sub: "warranty on everything" },
-          { icon: "→", val: "Free", sub: "shipping on £40 orders" },
-        ].map((t, i) => (
-          <div key={i} style={{ padding: "28px 32px", background: t.yellow ? "var(--co-yellow)" : "var(--co-surface)", borderRight: i < 3 ? "1px solid var(--co-hair)" : "none", display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: t.yellow ? "rgba(0,0,0,0.08)" : "var(--co-bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-              {t.icon}
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{t.val}</div>
-              <div style={{ fontSize: 12, color: "var(--co-ink-2)", marginTop: 2 }}>{t.sub}</div>
+          {
+            k: "4.8★", v: "across 12,480 reviews", yellow: true,
+            icon: (
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 4 L19.2 11.4 L27 12.2 L21.2 17.4 L23 25 L16 21 L9 25 L10.8 17.4 L5 12.2 L12.8 11.4 Z"/>
+              </svg>
+            ),
+          },
+          {
+            k: "30-day", v: "no-questions returns",
+            icon: (
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 14 A10 10 0 1 1 8 22"/>
+                <path d="M3 10 L6 14 L10 11"/>
+                <text x="16" y="20" textAnchor="middle" fontSize="7" fontWeight="700" fontFamily="Inter Tight, sans-serif" stroke="none" fill="currentColor">30</text>
+              </svg>
+            ),
+          },
+          {
+            k: "2-yr", v: "warranty on everything",
+            icon: (
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 4 L26 8 V15 C26 21 21 25.5 16 28 C11 25.5 6 21 6 15 V8 Z"/>
+                <path d="M11.5 16 L14.5 19 L20.5 13"/>
+              </svg>
+            ),
+          },
+          {
+            k: "Free", v: "shipping on £40 orders",
+            icon: (
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="9" width="14" height="11" rx="1.5"/>
+                <path d="M17 12 L23 12 L27 16 V20 H17 Z"/>
+                <circle cx="9" cy="22" r="2.4"/>
+                <circle cx="22" cy="22" r="2.4"/>
+                <path d="M3 13 H17"/>
+              </svg>
+            ),
+          },
+        ].map((it, i) => (
+          <div key={i} className="trust-item" style={it.yellow ? { background: "var(--accent)", color: "var(--ink)" } : {}}>
+            <div className="trust-icon">{it.icon}</div>
+            <div className="trust-text">
+              <div className="trust-k">{it.k}</div>
+              <div className="trust-v">{it.v}</div>
             </div>
           </div>
         ))}
-      </div>
+      </section>
 
-      {/* THE SHELF */}
-      <section style={{ padding: "80px 40px 96px", background: "var(--co-bg)" }}>
-        {/* Header */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start", marginBottom: 48 }}>
+      {/* THE SHELF — grid section */}
+      <section className="grid-section" id="shop">
+        <div className="grid-header">
           <div>
-            <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--co-ink-3)", marginBottom: 10, fontWeight: 600 }}>THE SHELF</div>
-            <h2 style={{ fontFamily: "var(--co-serif)", fontWeight: 400, fontSize: "clamp(36px, 4vw, 52px)", lineHeight: 1.08, margin: 0 }}>
-              {products.length > 0 ? `${products.length} things` : "Things"}<br />worth checking out.
+            <span className="eyebrow">The shelf</span>
+            <h2 className="section-title">
+              {shelfProducts.length > 0 ? `${shelfProducts.length} things` : "Things"}<br />
+              worth checking out.
             </h2>
           </div>
-          <div style={{ paddingTop: 40 }}>
-            <p style={{ fontSize: 14, color: "var(--co-ink-2)", lineHeight: 1.65, margin: 0 }}>
-              Curated from thousands of products — only the ones our team would actually buy. No drop-shipped duds, no fake reviews, no "as seen on TV" nonsense.
-            </p>
-          </div>
+          <p className="grid-intro">
+            Curated weekly from thousands of gadgets — only the ones our team would actually buy. No drop-shipped duds, no fake reviews, no "as seen on TV" nonsense.
+          </p>
         </div>
 
-        {/* Category pills + sort */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 36, flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {CATEGORIES.map((cat) => (
-              <button key={cat} className={`co-cat-pill${activeCategory === cat ? " active" : ""}`} onClick={() => setActiveCategory(cat)}>
+        {/* Category strip */}
+        <div className="category-strip">
+          <div className="category-strip-inner">
+            {CATEGORIES.map((cat, i) => (
+              <button
+                key={cat}
+                className={`chip ${activeCategory === cat ? "chip-active" : "chip-inactive"}`}
+                onClick={() => setActiveCategory(cat)}
+              >
                 {cat}
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 13, color: "var(--co-ink-2)" }}>
-            Sorted by <strong style={{ color: "var(--co-ink)" }}>Most loved ↓</strong>
+          <div className="category-sort">
+            <span>Sorted by</span>
+            <strong style={{ color: "var(--ink)" }}>Most loved</strong>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9 L12 15 L18 9"/></svg>
           </div>
         </div>
 
         {/* Product grid */}
         {shelfProducts.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "64px 0", color: "var(--co-ink-3)", fontFamily: "var(--co-serif)", fontSize: 28 }}>
+          <p style={{ textAlign: "center", padding: "64px 0", color: "var(--muted)", fontFamily: "'Instrument Serif', serif", fontSize: 28 }}>
             The shelf is being stocked — check back soon.
-          </div>
+          </p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }}>
+          <div className="product-grid">
             {shelfProducts.map((p, idx) => (
-              <CheckoutrCard key={p.id} product={p} index={idx} onAdd={() => handleAdd(p)} grid />
+              <CoProductCard key={p.id} product={p} index={idx} onAdd={() => handleAdd(p)} />
             ))}
           </div>
         )}
 
-        {products.length > 0 && (
-          <div style={{ textAlign: "center", marginTop: 48 }}>
-            <Link to="/shop" style={{ fontSize: 14, fontWeight: 600, color: "var(--co-ink)", textDecoration: "underline", textUnderlineOffset: 4 }}>
-              Browse all {products.length} products →
+        {shelfProducts.length > 0 && (
+          <div className="grid-footer">
+            <Link to="/shop" className="link-arrow">
+              Browse all {shelfProducts.length} products
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 L19 12 M13 6 L19 12 L13 18"/></svg>
             </Link>
           </div>
         )}
       </section>
-
-      {/* NEWSLETTER (inside page, above footer) */}
-      <div style={{ background: "var(--co-bg)", borderTop: "1px solid var(--co-hair)", padding: "56px 40px" }}>
-        <div style={{ maxWidth: 480, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div style={{ width: 32, height: 32, background: "var(--co-yellow)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>✓</div>
-            <span style={{ fontFamily: "var(--co-serif)", fontSize: 20, fontStyle: "italic" }}>{company_name}</span>
-          </div>
-          <p style={{ fontSize: 13, color: "var(--co-ink-2)", marginBottom: 20, lineHeight: 1.55 }}>
-            Gear that actually works, at prices that don't insult you. Get £10 off your first order.
-          </p>
-          {newsletterSent ? (
-            <p style={{ fontSize: 13, color: "green", fontWeight: 600 }}>✓ You're in! Check your inbox for the code.</p>
-          ) : (
-            <form onSubmit={submitNewsletter} style={{ display: "flex", gap: 10 }}>
-              <input
-                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your email"
-                style={{ flex: 1, border: "1px solid var(--co-hair)", borderRadius: 999, padding: "12px 18px", fontSize: 13, outline: "none", background: "var(--co-surface)", color: "var(--co-ink)" }}
-              />
-              <button type="submit" className="co-pill-btn yellow" style={{ fontSize: 13, padding: "12px 20px" }}>
-                Get £10 off
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
     </SiteLayout>
   );
 }
 
-function CheckoutrCard({ product, index, onAdd, grid }: { product: Product | null; index: number; onAdd: () => void; grid?: boolean }) {
-  const bg = CARD_PASTELS[index % CARD_PASTELS.length];
-  const showSale = product && Number(product.price_1) > Number(product.price_2) && Number(product.price_2) > 0;
-  const discountPct = showSale ? Math.round((1 - Number(product!.price_2) / Number(product!.price_1)) * 100) : 0;
-
-  const cardStyle: React.CSSProperties = grid
-    ? { display: "flex", flexDirection: "column", borderRadius: 20, overflow: "hidden", background: "var(--co-surface)", border: "1px solid var(--co-hair)" }
-    : { flexShrink: 0, width: 300, display: "flex", flexDirection: "column", borderRadius: 20, overflow: "hidden", scrollSnapAlign: "start" };
+function CoProductCard({ product, index, onAdd }: { product: Product; index: number; onAdd: () => void }) {
+  const { tint, ink } = CARD_TINTS[index % CARD_TINTS.length];
+  const showSale = Number(product.price_1) > Number(product.price_2) && Number(product.price_2) > 0;
+  const offPct = showSale ? Math.round((1 - Number(product.price_2) / Number(product.price_1)) * 100) : 0;
 
   return (
-    <div className="co-card" style={cardStyle}>
-      {/* Image area */}
-      <div style={{ position: "relative", background: bg, aspectRatio: grid ? "1 / 1.1" : "1 / 1.4", overflow: "hidden" }}>
-        {/* Category tag */}
-        {product && (
-          <span style={{ position: "absolute", top: 14, left: 14, fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--co-ink-2)", zIndex: 2 }}>
-            {product.subdomain?.replace(/-/g, " ").toUpperCase() || "PRODUCT"}
-          </span>
-        )}
-        {/* Discount badge */}
-        {showSale && discountPct > 0 && (
-          <span style={{ position: "absolute", top: 14, right: 14, background: "#1A1A1A", color: "#fff", borderRadius: 999, padding: "5px 10px", fontSize: 11, fontWeight: 700, zIndex: 2 }}>
-            -{discountPct}%
-          </span>
-        )}
-        {/* Product image or placeholder icon */}
-        {product?.image_url ? (
-          <img src={product.image_url} alt={product.product_name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", padding: 20 }} />
-        ) : (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity={0.35}>
-              <rect x="8" y="8" width="48" height="48" rx="8" />
-              <circle cx="32" cy="32" r="10" />
-              <line x1="32" y1="8" x2="32" y2="22" />
-              <line x1="32" y1="42" x2="32" y2="56" />
+    <Link to="/products/$subdomain" params={{ subdomain: product.subdomain }} className="product-card" style={{ background: tint, color: ink }}>
+      <div className="product-media">
+        <span className="product-tag">{product.subdomain?.replace(/-/g, " ") || "Product"}</span>
+        <div className="product-icon-wrap">
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.product_name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", stroke: ink, fill: "none", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" }}>
+              <rect x="22" y="30" width="56" height="40" rx="4"/>
+              <path d="M22 42 L78 42"/>
+              <circle cx="66" cy="56" r="3"/>
             </svg>
-          </div>
-        )}
-        {/* Hover add button */}
-        {product && (
-          <button
-            className="co-checkout-btn"
-            onClick={(e) => { e.preventDefault(); onAdd(); }}
-            style={{ position: "absolute", left: 12, right: 12, bottom: 12, background: "var(--co-yellow)", color: "var(--co-ink)", border: "none", borderRadius: 12, padding: "13px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: 0, transform: "translateY(6px)", transition: "opacity .22s, transform .22s", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3 }}
-          >
-            <span>Add to checkout</span>
-            <span>→</span>
-          </button>
-        )}
+          )}
+        </div>
+        {showSale && offPct > 0 && <span className="product-off">−{offPct}%</span>}
       </div>
 
-      {/* Info */}
-      <div style={{ padding: "16px 16px 8px" }}>
-        {product ? (
-          <Link to="/products/$subdomain" params={{ subdomain: product.subdomain }} style={{ color: "inherit", textDecoration: "none" }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 6px", lineHeight: 1.3, color: "var(--co-ink)" }}>{product.product_name}</h3>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
-              <span style={{ fontWeight: 700 }}>£{Number(product.price_2).toFixed(2)}</span>
-              {showSale && <span style={{ textDecoration: "line-through", color: "var(--co-ink-3)", fontSize: 12 }}>£{Number(product.price_1).toFixed(2)}</span>}
-            </div>
-          </Link>
-        ) : (
-          <div style={{ height: 40, background: "var(--co-hair)", borderRadius: 6, opacity: 0.5 }} />
-        )}
+      <div className="product-meta">
+        <div className="product-name">{product.product_name}</div>
+        <div className="product-price-row">
+          <span className="product-price">£{Number(product.price_2).toFixed(2)}</span>
+          {showSale && <span className="product-was">£{Number(product.price_1).toFixed(2)}</span>}
+        </div>
       </div>
 
-      {/* Yellow checkout button (always visible below card) */}
-      {product && (
-        <button
-          onClick={onAdd}
-          style={{ margin: "8px 12px 14px", background: "var(--co-yellow)", color: "var(--co-ink)", border: "none", borderRadius: 12, padding: "13px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-        >
-          <span>Add to checkout</span>
-          <span>→</span>
-        </button>
-      )}
-    </div>
+      <button
+        className="product-cta"
+        onClick={(e) => { e.preventDefault(); onAdd(); }}
+        style={{ background: "var(--accent)", color: "#141414", border: "none", cursor: "pointer" }}
+      >
+        <span>Add to checkout</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12 L19 12 M13 6 L19 12 L13 18"/></svg>
+      </button>
+    </Link>
   );
 }
