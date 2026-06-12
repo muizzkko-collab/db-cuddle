@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isCountryCode, mapIsoToCode, SUPPORTED_COUNTRIES, type CountryCode } from "@/lib/countries";
 import { SiteLayout } from "@/components/site-layout";
 import { CheckoutPage } from "@/components/checkout-page";
@@ -21,22 +21,9 @@ export const Route = createFileRoute("/")({
   component: RootRouter,
 });
 
-const TESTIMONIALS = [
-  { name: "Eloise M.", location: "London · Customer since 2024", text: "I was a skeptic. Six weeks in, my whole routine is simpler and actually delivers. The curation is doing real work here.", stars: 5, initials: "EM", productTag: "Voltix Energy Saver", source: "Trustpilot · Verified" },
-  { name: "Jordan R.", location: "Brooklyn · Customer since 2023", text: "Finally a shop that doesn't make me read sixteen review blogs. They've already done the homework — and shipping was lightning fast.", stars: 5, initials: "JR", productTag: "OraLaura Water Flosser", source: "Google · Verified" },
-  { name: "Sana K.", location: "Berlin · Customer since 2025", text: "The bundle pricing is genuinely good and the customer support team actually replies. I'm on subscription, which I never do.", stars: 5, initials: "SK", productTag: "Bio Valtix Pro", source: "Trustpilot · Verified" },
-];
-
-const PRESS_LOGOS = ["Forbes", "TechRadar", "The Times", "Wired", "GQ", "Stylist", "Monocle"];
-
-const MARQUEE_ITEMS = [
-  "Tested for 6+ weeks",
-  "Independent brands",
-  "Honest pricing",
-  "Fast tracked shipping",
-  "30-day returns",
-  "Real customer reviews",
-];
+const CARD_PASTELS = ["#FCEAE8","#EAE6F8","#E0EDF8","#DFF0E8","#F5E0EE","#F8F0DC","#E8F0E8","#F0E8F4"];
+const MARQUEE_TRUST = ["2-YEAR WARRANTY INCLUDED","WORLDWIDE DELIVERY","SAME-DAY DISPATCH BEFORE 3PM","VERIFIED-MERCHANT PROGRAM","FREE SHIPPING OVER £40","30-DAY MONEY-BACK"];
+const CATEGORIES = ["All","Wellness","Recovery","Tech","Home","Beauty","Fitness","Audio"];
 
 function RootRouter() {
   const [subdomain, setSubdomain] = useState<string | null>(null);
@@ -133,32 +120,39 @@ function RootRouter() {
 
 type Product = Tables<"products">;
 
+function useCountdown(initialSeconds: number) {
+  const [secs, setSecs] = useState(initialSeconds);
+  useEffect(() => {
+    const t = setInterval(() => setSecs((s) => (s > 0 ? s - 1 : initialSeconds)), 1000);
+    return () => clearInterval(t);
+  }, [initialSeconds]);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 function MainStore() {
-  const { hero_headline, hero_subheadline, hero_image_url, company_name, rootDomain } = useDomain();
+  const { company_name, rootDomain } = useDomain();
   const { addItem, openCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [email, setEmail] = useState("");
   const [newsletterSent, setNewsletterSent] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const countdown = useCountdown(9589);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const load = async () => {
       const domain = rootDomain || MAIN_DOMAIN;
       const isMain = domain === MAIN_DOMAIN;
-      // Main domain gets unassigned products too; other domains get strict match only
-      const filter = isMain
-        ? `root_domain.eq.${MAIN_DOMAIN},root_domain.is.null`
-        : `root_domain.eq.${domain}`;
+      const filter = isMain ? `root_domain.eq.${MAIN_DOMAIN},root_domain.is.null` : `root_domain.eq.${domain}`;
       const { data, error } = await (supabase.from("products").select("*").neq("active", false) as any)
-        .or(filter)
-        .order("created_at", { ascending: false })
-        .limit(6);
+        .or(filter).order("created_at", { ascending: false });
       if (!error) { setProducts((data ?? []) as Product[]); return; }
-      // Fallback if root_domain column doesn't exist yet
-      const { data: fallback } = await supabase.from("products").select("*").neq("active", false)
-        .order("created_at", { ascending: false }).limit(6);
-      setProducts((fallback ?? []) as Product[]);
+      const { data: fb } = await supabase.from("products").select("*").neq("active", false).order("created_at", { ascending: false });
+      setProducts((fb ?? []) as Product[]);
     };
-    loadProducts();
+    load();
   }, [rootDomain]);
 
   const handleAdd = (p: Product) => {
@@ -177,430 +171,297 @@ function MainStore() {
     setEmail("");
   };
 
-  const heroProduct = products[0];
+  const shelfProducts = useMemo(() => products.slice(0, 8), [products]);
 
   return (
     <SiteLayout>
-      <div
-        className="ch-store"
-        style={{
-          background: "var(--ch-bg)",
-          color: "var(--ch-ink)",
-          fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, sans-serif",
-        }}
-      >
-        <style>{`
-          .ch-store {
-            --ch-bg: #F4EFE7;
-            --ch-bg-elev: #FAF6EE;
-            --ch-surface: #FFFFFF;
-            --ch-ink: #1F1C17;
-            --ch-ink-2: #4B463E;
-            --ch-ink-3: #8C8478;
-            --ch-hair: #E5DED1;
-            --ch-accent: #6C7C5E;
-            --ch-accent-2: #C77A56;
-            --ch-accent-soft: #D8E0CC;
-            --ch-sale: #B5432B;
-            --ch-serif: 'Instrument Serif', Georgia, serif;
-          }
-          .ch-store .ch-display { font-family: var(--ch-serif); font-weight: 400; letter-spacing: -0.015em; }
-          .ch-store .ch-kicker { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ch-ink-2); font-weight: 500; }
-          .ch-store .ch-eyebrow { font-family: var(--ch-serif); font-style: italic; font-size: 18px; color: var(--ch-accent); }
-          .ch-store .ch-btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 999px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; transition: transform .2s ease, background .2s ease, color .2s ease; border: 1px solid transparent; }
-          .ch-store .ch-btn:hover { transform: translateY(-1px); }
-          .ch-store .ch-btn-primary { background: var(--ch-ink); color: #fff; }
-          .ch-store .ch-btn-ghost { background: transparent; color: var(--ch-ink); border-color: var(--ch-ink); }
-          .ch-store .ch-btn-ghost:hover { background: var(--ch-ink); color: #fff; }
-          @keyframes ch-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-          .ch-store .ch-marquee-track { animation: ch-marquee 36s linear infinite; }
-          .ch-store .ch-product:hover .ch-add { opacity: 1; transform: translateY(0); }
-          .ch-store .ch-product:hover .ch-img-wrap { transform: translateY(-4px); }
-        `}</style>
+      <style>{`
+        :root {
+          --co-bg: #FAF7F0;
+          --co-ink: #1A1A1A;
+          --co-ink-2: #555;
+          --co-ink-3: #999;
+          --co-yellow: #F5C242;
+          --co-hair: #E8E4DC;
+          --co-surface: #fff;
+          --co-serif: 'Instrument Serif', Georgia, serif;
+        }
+        body, .ch-store { background: var(--co-bg) !important; }
+        @keyframes co-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .co-marquee { animation: co-marquee 28s linear infinite; display: flex; gap: 0; white-space: nowrap; }
+        .co-card:hover .co-checkout-btn { opacity: 1 !important; transform: translateY(0) !important; }
+        .co-pill-btn { background: #1A1A1A; color: #fff; border-radius: 999px; padding: 14px 24px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background .2s; }
+        .co-pill-btn:hover { background: #333; }
+        .co-pill-btn.yellow { background: var(--co-yellow); color: #1A1A1A; }
+        .co-pill-btn.yellow:hover { background: #e0b030; }
+        .co-cat-pill { background: transparent; border: 1px solid var(--co-hair); border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--co-ink-2); transition: all .15s; }
+        .co-cat-pill.active { background: var(--co-ink); color: #fff; border-color: var(--co-ink); }
+        .co-cat-pill:hover:not(.active) { border-color: #aaa; color: var(--co-ink); }
+      `}</style>
 
-        {/* ANNOUNCEMENT */}
-        <div style={{ background: "var(--ch-ink)", color: "#F4EFE7", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", padding: "10px 0", textAlign: "center", fontWeight: 500 }}>
-          ✦ Free UK / US / EU shipping over £50 · 30-day returns · 50,000+ orders shipped
-        </div>
+      {/* ANNOUNCEMENT BAR */}
+      <div style={{ background: "#141414", color: "#fff", fontSize: 12, padding: "9px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, fontWeight: 500 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5A623", display: "inline-block" }} />
+          End-of-season clearance — up to 60% off
+        </span>
+        <span style={{ opacity: 0.4 }}>|</span>
+        <span>Ends in <strong style={{ fontVariantNumeric: "tabular-nums" }}>{countdown}</strong></span>
+      </div>
 
-        {/* HERO */}
-        <section style={{ position: "relative", overflow: "hidden", padding: "56px 0 80px" }}>
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 56, alignItems: "center" }} className="ch-hero-grid">
-              <div>
-                <div className="ch-kicker">— Tested & approved · Issue No. 07</div>
-                <h1 className="ch-display" style={{ fontSize: "clamp(56px, 6.8vw, 104px)", lineHeight: 1.08, margin: "22px 0 32px", paddingBottom: "0.35em" }}>
-                  {hero_headline?.includes("everyday") || hero_headline?.includes("Everyday") ? (
-                    <>Products that<br />actually work, for<br /><i style={{ color: "var(--ch-accent)" }}>everyday life.</i></>
-                  ) : (
-                    <>{hero_headline?.split(" ").slice(0, -1).join(" ")}<br /><i style={{ color: "var(--ch-accent)" }}>{hero_headline?.split(" ").slice(-1)}.</i></>
-                  )}
-                </h1>
-                <p style={{ fontSize: 17, lineHeight: 1.55, color: "var(--ch-ink-2)", maxWidth: 460, margin: "0 0 32px" }}>
-                  {hero_subheadline}
-                </p>
-                <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                  <Link to="/shop" className="ch-btn ch-btn-primary">Shop now →</Link>
-                  <Link to="/about" className="ch-btn ch-btn-ghost">Our standards</Link>
-                </div>
-                <div style={{ display: "flex", gap: 36, marginTop: 48, paddingTop: 28, borderTop: "1px solid var(--ch-hair)" }}>
-                  <div>
-                    <span className="ch-display" style={{ fontSize: 32, lineHeight: 1, display: "block" }}>50k+</span>
-                    <div style={{ fontSize: 11, color: "var(--ch-ink-3)", letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 6 }}>Happy customers</div>
-                  </div>
-                  <div>
-                    <span className="ch-display" style={{ fontSize: 32, lineHeight: 1, display: "block" }}>4.9★</span>
-                    <div style={{ fontSize: 11, color: "var(--ch-ink-3)", letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 6 }}>12,400 reviews</div>
-                  </div>
-                  <div>
-                    <span className="ch-display" style={{ fontSize: 32, lineHeight: 1, display: "block" }}>30 day</span>
-                    <div style={{ fontSize: 11, color: "var(--ch-ink-3)", letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 6 }}>No-quibble returns</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Hero product stage */}
-              <div style={{ position: "relative", aspectRatio: "1 / 1.05", background: "radial-gradient(120% 80% at 50% 30%, var(--ch-bg-elev) 0%, var(--ch-bg) 70%)", borderRadius: 32, overflow: "hidden", boxShadow: "0 1px 2px rgba(31,28,23,.04), 0 24px 60px -28px rgba(31,28,23,.18)" }}>
-                <div style={{ position: "absolute", top: 24, left: 24, background: "rgba(255,255,255,0.86)", backdropFilter: "blur(8px)", border: "1px solid var(--ch-hair)", borderRadius: 999, padding: "8px 14px", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", display: "inline-flex", gap: 8, alignItems: "center", zIndex: 2 }}>
-                  <span style={{ width: 6, height: 6, background: "var(--ch-accent)", borderRadius: "50%" }} />
-                  Editor's pick
-                </div>
-                {heroProduct?.image_url ? (
-                  <img src={heroProduct.image_url} alt={heroProduct.product_name}
-                    style={{ position: "absolute", left: "10%", top: "8%", width: "80%", height: "80%", objectFit: "contain" }} />
-                ) : (
-                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--ch-serif)", fontSize: 96, color: "var(--ch-ink-3)" }}>
-                    {company_name?.[0] ?? "C"}
-                  </div>
-                )}
-                {heroProduct && (
-                  <div style={{ position: "absolute", right: 22, bottom: 22, background: "#fff", borderRadius: 14, padding: "16px 18px", boxShadow: "0 1px 2px rgba(31,28,23,.04), 0 24px 60px -28px rgba(31,28,23,.18)", maxWidth: 240 }}>
-                    <div className="ch-display" style={{ fontSize: 20, lineHeight: 1.1 }}>{heroProduct.product_name}</div>
-                    <div style={{ fontSize: 12, color: "var(--ch-ink-2)", marginTop: 4, letterSpacing: "0.04em" }}>£{Number(heroProduct.price_2).toFixed(2)} · Bundle</div>
-                    <div style={{ color: "var(--ch-accent-2)", fontSize: 12, letterSpacing: 2, marginTop: 8 }}>★★★★★ <span style={{ color: "var(--ch-ink-3)", letterSpacing: 0, marginLeft: 6 }}>2,143 reviews</span></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* TRUST STRIP */}
-        <div style={{ background: "var(--ch-surface)", borderTop: "1px solid var(--ch-hair)", borderBottom: "1px solid var(--ch-hair)" }}>
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }} className="ch-trust-grid">
-              {[
-                { ttl: "Free shipping", sub: "On orders over £50" },
-                { ttl: "30-day returns", sub: "No questions, ever" },
-                { ttl: "Tested for real life", sub: "6+ weeks, by us" },
-                { ttl: "Independent brands", sub: "Founder-led, vetted" },
-              ].map((t, i) => (
-                <div key={t.ttl} style={{ display: "flex", gap: 16, alignItems: "center", padding: "28px 32px", borderRight: i < 3 ? "1px solid var(--ch-hair)" : "none" }}>
-                  <div style={{ width: 40, height: 40, flex: "0 0 40px", borderRadius: "50%", background: "var(--ch-bg-elev)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ch-accent)", fontFamily: "var(--ch-serif)", fontSize: 20 }}>
-                    {i + 1}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{t.ttl}</div>
-                    <div style={{ fontSize: 12, color: "var(--ch-ink-3)", marginTop: 2 }}>{t.sub}</div>
-                  </div>
-                </div>
+      {/* SCROLLING TRUST MARQUEE */}
+      <div style={{ background: "#1F1C17", color: "#aaa", fontSize: 11, padding: "8px 0", overflow: "hidden", letterSpacing: "0.1em" }}>
+        <div className="co-marquee">
+          {[0, 1].map((r) => (
+            <span key={r} style={{ display: "inline-flex", gap: 0 }} aria-hidden={r === 1}>
+              {MARQUEE_TRUST.map((item) => (
+                <span key={item} style={{ display: "inline-flex", alignItems: "center" }}>
+                  <span style={{ padding: "0 20px" }}>{item}</span>
+                  <span style={{ opacity: 0.4 }}>+</span>
+                </span>
               ))}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* HERO */}
+      <section style={{ background: "var(--co-bg)", padding: "72px 40px 56px", textAlign: "center" }}>
+        {/* Avatar dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: -8, marginBottom: 14 }}>
+          {["#FCEAE8","#EAE6F8","#E0EDF8","#DFF0E8","#F5E0EE"].map((c, i) => (
+            <div key={i} style={{ width: 36, height: 36, borderRadius: "50%", background: c, border: "2px solid var(--co-bg)", marginLeft: i === 0 ? 0 : -10, zIndex: 5 - i, position: "relative" }} />
+          ))}
+        </div>
+        {/* Rating */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, color: "var(--co-ink-2)", marginBottom: 28 }}>
+          <span style={{ color: "#F5C242", letterSpacing: 2 }}>★★★★★</span>
+          <strong style={{ color: "var(--co-ink)" }}>4.8</strong>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>12,480 verified reviews</span>
+        </div>
+
+        {/* HERO HEADING */}
+        <h1 style={{ fontFamily: "'Manrope', -apple-system, sans-serif", fontWeight: 800, fontSize: "clamp(48px, 7.5vw, 96px)", lineHeight: 1.05, letterSpacing: "-0.025em", color: "var(--co-ink)", margin: "0 auto 24px", maxWidth: 900 }}>
+          The good stuff,{" "}
+          <em style={{ fontStyle: "italic", fontWeight: 800 }}>checked out</em>{" "}
+          fast.
+        </h1>
+
+        <p style={{ fontSize: 16, color: "var(--co-ink-2)", margin: "0 auto 36px", maxWidth: 420, lineHeight: 1.55 }}>
+          Hand-picked products at sharp prices. Free shipping over £40.<br />
+          Thirty-day money-back, no questions.
+        </p>
+
+        {/* CTAs */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <Link to="/shop">
+            <button className="co-pill-btn yellow">Shop everything →</button>
+          </Link>
+          <Link to="/shop" style={{ fontSize: 14, fontWeight: 600, color: "var(--co-ink)", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            Best sellers
+          </Link>
+        </div>
+
+        {/* Trust bullets */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 28, fontSize: 13, color: "var(--co-ink-3)" }}>
+          {["Free shipping £40+", "30-day returns", "2-year warranty"].map((t) => (
+            <span key={t} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--co-yellow)", display: "inline-block" }} />
+              {t}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* HORIZONTAL PRODUCT CAROUSEL */}
+      <section style={{ padding: "0 0 64px", overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 16, padding: "0 40px", overflowX: "auto", scrollSnapType: "x mandatory", scrollbarWidth: "none" }}>
+          {(products.length > 0 ? products : Array(6).fill(null)).map((p, idx) => (
+            <CheckoutrCard key={p?.id ?? idx} product={p} index={idx} onAdd={p ? () => handleAdd(p) : () => {}} />
+          ))}
+        </div>
+      </section>
+
+      {/* TRUST STRIP */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", borderTop: "1px solid var(--co-hair)", borderBottom: "1px solid var(--co-hair)" }}>
+        {[
+          { icon: "★", val: "4.8★", sub: "across 12,480 reviews", yellow: true },
+          { icon: "↩", val: "30-day", sub: "no-questions returns" },
+          { icon: "◎", val: "2-yr", sub: "warranty on everything" },
+          { icon: "→", val: "Free", sub: "shipping on £40 orders" },
+        ].map((t, i) => (
+          <div key={i} style={{ padding: "28px 32px", background: t.yellow ? "var(--co-yellow)" : "var(--co-surface)", borderRight: i < 3 ? "1px solid var(--co-hair)" : "none", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: t.yellow ? "rgba(0,0,0,0.08)" : "var(--co-bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+              {t.icon}
             </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{t.val}</div>
+              <div style={{ fontSize: 12, color: "var(--co-ink-2)", marginTop: 2 }}>{t.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* THE SHELF */}
+      <section style={{ padding: "80px 40px 96px", background: "var(--co-bg)" }}>
+        {/* Header */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start", marginBottom: 48 }}>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--co-ink-3)", marginBottom: 10, fontWeight: 600 }}>THE SHELF</div>
+            <h2 style={{ fontFamily: "var(--co-serif)", fontWeight: 400, fontSize: "clamp(36px, 4vw, 52px)", lineHeight: 1.08, margin: 0 }}>
+              {products.length > 0 ? `${products.length} things` : "Things"}<br />worth checking out.
+            </h2>
+          </div>
+          <div style={{ paddingTop: 40 }}>
+            <p style={{ fontSize: 14, color: "var(--co-ink-2)", lineHeight: 1.65, margin: 0 }}>
+              Curated from thousands of products — only the ones our team would actually buy. No drop-shipped duds, no fake reviews, no "as seen on TV" nonsense.
+            </p>
           </div>
         </div>
 
-        {/* PROMO BANNERS */}
-        <section style={{ padding: "96px 0 40px" }}>
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ textAlign: "center", marginBottom: 56 }}>
-              <span className="ch-eyebrow" style={{ display: "block", marginBottom: 10 }}>— What's on now</span>
-              <h2 className="ch-display" style={{ fontSize: 52, lineHeight: 1, margin: 0 }}>Edits worth opening.</h2>
-              <p style={{ color: "var(--ch-ink-2)", fontSize: 15, maxWidth: 460, margin: "14px auto 0" }}>
-                Seasonal bundles and the discoveries our team can't stop using.
-              </p>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20 }} className="ch-promos">
-              {/* Big promo */}
-              <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", minHeight: 380, display: "flex", alignItems: "flex-end", padding: 32, color: "#fff", background: "linear-gradient(120deg, #2b3225 0%, #455338 100%)" }}>
-                <div style={{ position: "relative", zIndex: 1, maxWidth: "60%" }}>
-                  <span style={{ display: "inline-block", background: "rgba(255,255,255,0.9)", color: "var(--ch-ink)", padding: "6px 12px", borderRadius: 999, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 600, marginBottom: 16 }}>
-                    Save 25% · This week
-                  </span>
-                  <h3 className="ch-display" style={{ fontSize: 44, lineHeight: 1.02, margin: "0 0 12px" }}>The Essentials<br />Bundle.</h3>
-                  <p style={{ fontSize: 14, opacity: 0.92, margin: "0 0 22px", maxWidth: 320 }}>
-                    Our three best-sellers, bundled. The kit that gets repeat orders every month.
-                  </p>
-                  <Link to="/shop" className="ch-btn" style={{ background: "#fff", color: "var(--ch-ink)" }}>Shop the bundle →</Link>
-                </div>
-              </div>
-
-              {/* Stacked small promos */}
-              <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 20 }}>
-                <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", minHeight: 180, padding: "24px 28px", color: "#fff", background: "linear-gradient(120deg, #C77A56 0%, #D9926D 100%)", display: "flex", alignItems: "flex-end" }}>
-                  <div style={{ position: "relative", zIndex: 1, maxWidth: "70%" }}>
-                    <span style={{ display: "inline-block", background: "rgba(255,255,255,0.9)", color: "var(--ch-ink)", padding: "5px 10px", borderRadius: 999, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 600, marginBottom: 12 }}>
-                      New arrivals
-                    </span>
-                    <h3 className="ch-display" style={{ fontSize: 28, lineHeight: 1.02, margin: "0 0 10px" }}>Just landed.</h3>
-                    <p style={{ fontSize: 13, opacity: 0.92, margin: "0 0 14px" }}>The latest drop from our most-loved brands.</p>
-                    <Link to="/shop" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid currentColor", paddingBottom: 4 }}>
-                      Explore →
-                    </Link>
-                  </div>
-                </div>
-                <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", minHeight: 180, padding: "24px 28px", color: "#fff", background: "linear-gradient(120deg, #5a4733 0%, #826851 100%)", display: "flex", alignItems: "flex-end" }}>
-                  <div style={{ position: "relative", zIndex: 1, maxWidth: "70%" }}>
-                    <span style={{ display: "inline-block", background: "rgba(255,255,255,0.9)", color: "var(--ch-ink)", padding: "5px 10px", borderRadius: 999, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 600, marginBottom: 12 }}>
-                      Awards 2026
-                    </span>
-                    <h3 className="ch-display" style={{ fontSize: 28, lineHeight: 1.02, margin: "0 0 10px" }}>Best of the year.</h3>
-                    <p style={{ fontSize: 13, opacity: 0.92, margin: "0 0 14px" }}>The products our community voted into the hall of fame.</p>
-                    <Link to="/shop" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid currentColor", paddingBottom: 4 }}>
-                      See the list →
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* FEATURED PRODUCTS */}
-        <section style={{ padding: "96px 0" }} id="products">
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ textAlign: "center", marginBottom: 56 }}>
-              <span className="ch-eyebrow" style={{ display: "block", marginBottom: 10 }}>— Most-loved this month</span>
-              <h2 className="ch-display" style={{ fontSize: 52, lineHeight: 1, margin: 0 }}>Featured products.</h2>
-              <p style={{ color: "var(--ch-ink-2)", fontSize: 15, maxWidth: 460, margin: "14px auto 0" }}>
-                An opinionated selection. We only stock what our team genuinely uses.
-              </p>
-            </div>
-
-            {products.length === 0 ? (
-              <p style={{ textAlign: "center", color: "var(--ch-ink-3)" }}>No products yet — check back soon!</p>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 28 }} className="ch-products-grid">
-                {products.map((p, idx) => (
-                  <EditorialProductCard key={p.id} product={p} index={idx} onAdd={() => handleAdd(p)} />
-                ))}
-              </div>
-            )}
-
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 56 }}>
-              <Link to="/shop" className="ch-btn ch-btn-ghost">Shop all products →</Link>
-            </div>
-          </div>
-        </section>
-
-        {/* MARQUEE */}
-        <div style={{ background: "var(--ch-accent)", color: "#F4EFE7", overflow: "hidden", padding: "14px 0" }}>
-          <div className="ch-marquee-track" style={{ display: "flex", gap: 56, whiteSpace: "nowrap", fontFamily: "var(--ch-serif)", fontSize: 22, fontStyle: "italic" }}>
-            {[0, 1].map((rep) => (
-              <span key={rep} style={{ display: "inline-flex", alignItems: "center", gap: 56 }} aria-hidden={rep === 1}>
-                {MARQUEE_ITEMS.map((item, i) => (
-                  <span key={`${rep}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 56 }}>
-                    {item}
-                    <span style={{ fontSize: 14, opacity: 0.6 }}>✦</span>
-                  </span>
-                ))}
-              </span>
+        {/* Category pills + sort */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 36, flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {CATEGORIES.map((cat) => (
+              <button key={cat} className={`co-cat-pill${activeCategory === cat ? " active" : ""}`} onClick={() => setActiveCategory(cat)}>
+                {cat}
+              </button>
             ))}
           </div>
-        </div>
-
-        {/* BRAND STORY */}
-        <section style={{ padding: "96px 0" }}>
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ background: "var(--ch-bg-elev)", borderRadius: 24, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", minHeight: 520 }} className="ch-story-grid">
-                <div style={{ position: "relative", background: "var(--ch-accent-soft)", minHeight: 320 }}>
-                  {hero_image_url ? (
-                    <img src={hero_image_url} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--ch-serif)", fontSize: 120, color: "var(--ch-accent)", opacity: 0.4 }}>
-                      ✦
-                    </div>
-                  )}
-                  <div style={{ position: "absolute", bottom: 24, left: 24, width: 110, height: 110, borderRadius: "50%", background: "var(--ch-ink)", color: "var(--ch-bg)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--ch-serif)", textAlign: "center", lineHeight: 1.05, fontSize: 14, border: "6px solid var(--ch-bg-elev)" }}>
-                    Vetted<br />by us<br />2026
-                  </div>
-                </div>
-                <div style={{ padding: "72px 64px" }} className="ch-story-body">
-                  <span className="ch-eyebrow" style={{ display: "inline-block", marginBottom: 14 }}>— Our standards</span>
-                  <h2 className="ch-display" style={{ fontSize: 56, lineHeight: 1, margin: "0 0 24px" }}>The shelf is full.<br />Trust is rare.</h2>
-                  <p style={{ fontSize: 16, color: "var(--ch-ink-2)", maxWidth: 460, margin: "0 0 18px" }}>
-                    We started {company_name} because shopping online means wading through hype. Every product we stock passes three filters: real-world testing, transparent specs, and a guarantee that backs it up.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "24px 32px", margin: "32px 0 36px" }}>
-                    {[
-                      { h: "Read the spec", t: "Honest descriptions. No marketing fluff hiding the real story." },
-                      { h: "Tested in real life", t: "Six weeks minimum, by our team — not just spec sheets." },
-                      { h: "Independent first", t: "We work with founder-led brands building products that last." },
-                      { h: "Backed by guarantee", t: "30-day no-quibble returns. We stand behind everything we ship." },
-                    ].map((p) => (
-                      <div key={p.h} style={{ borderLeft: "1px solid var(--ch-hair)", paddingLeft: 16 }}>
-                        <h4 className="ch-display" style={{ fontSize: 18, margin: "0 0 4px", fontWeight: 500 }}>{p.h}</h4>
-                        <p style={{ fontSize: 13, margin: 0, color: "var(--ch-ink-2)" }}>{p.t}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <Link to="/about" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid currentColor", paddingBottom: 4 }}>
-                    Read the full standards →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* REVIEWS */}
-        <section style={{ padding: "96px 0" }}>
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 48 }} className="ch-reviews-head">
-              <div>
-                <span className="ch-eyebrow">— What people say</span>
-                <h2 className="ch-display" style={{ fontSize: 52, lineHeight: 1, margin: "8px 0 0", textAlign: "left" }}>
-                  Loved by 50,000+<br />everyday customers.
-                </h2>
-              </div>
-              <div style={{ textAlign: "right", fontSize: 13, color: "var(--ch-ink-2)" }}>
-                <span className="ch-display" style={{ fontSize: 38, lineHeight: 1, display: "block", marginBottom: 6 }}>4.9 / 5</span>
-                <span style={{ color: "var(--ch-accent-2)", letterSpacing: 3 }}>★★★★★</span>
-                <br />
-                <span style={{ marginTop: 6, display: "inline-block" }}>12,408 verified reviews</span>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }} className="ch-reviews-grid">
-              {TESTIMONIALS.map((t) => (
-                <div key={t.name} style={{ background: "var(--ch-surface)", border: "1px solid var(--ch-hair)", borderRadius: 18, padding: "32px 28px", display: "flex", flexDirection: "column", gap: 18 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "var(--ch-accent-2)", letterSpacing: 2, fontSize: 14 }}>{"★".repeat(t.stars)}</span>
-                    <span style={{ fontSize: 11, color: "var(--ch-ink-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{t.source}</span>
-                  </div>
-                  <p className="ch-display" style={{ fontSize: 22, lineHeight: 1.25, margin: 0 }}>"{t.text}"</p>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--ch-ink-2)", background: "var(--ch-bg-elev)", padding: "6px 10px", borderRadius: 999, alignSelf: "flex-start" }}>
-                    <span style={{ width: 14, height: 14, borderRadius: 4, background: "var(--ch-accent-soft)" }} />
-                    {t.productTag}
-                  </span>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: "auto" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--ch-accent-soft)", fontFamily: "var(--ch-serif)", fontSize: 18, color: "var(--ch-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {t.initials}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-                      <div style={{ fontSize: 12, color: "var(--ch-ink-3)" }}>{t.location}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* PRESS */}
-        <div style={{ padding: "64px 0", background: "var(--ch-bg-elev)", borderTop: "1px solid var(--ch-hair)", borderBottom: "1px solid var(--ch-hair)" }}>
-          <div className="mx-auto" style={{ maxWidth: 1320, padding: "0 40px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 32 }}>
-              <div style={{ fontFamily: "var(--ch-serif)", fontStyle: "italic", fontSize: 18, color: "var(--ch-ink-2)" }}>As featured in —</div>
-              <div style={{ display: "flex", gap: 56, flexWrap: "wrap", alignItems: "center", opacity: 0.8 }}>
-                {PRESS_LOGOS.map((logo, i) => (
-                  <span key={logo} style={{
-                    fontFamily: i % 2 === 0 ? "var(--ch-serif)" : "'Manrope', sans-serif",
-                    fontStyle: i % 3 === 0 ? "italic" : "normal",
-                    fontWeight: i % 2 === 1 ? 800 : 400,
-                    fontSize: i % 2 === 0 ? 22 : 14,
-                    letterSpacing: i % 2 === 1 ? "0.18em" : "0.04em",
-                    textTransform: i % 2 === 1 ? "uppercase" : "none",
-                    color: "var(--ch-ink)",
-                  }}>{logo}</span>
-                ))}
-              </div>
-            </div>
+          <div style={{ fontSize: 13, color: "var(--co-ink-2)" }}>
+            Sorted by <strong style={{ color: "var(--co-ink)" }}>Most loved ↓</strong>
           </div>
         </div>
 
-        {/* NEWSLETTER */}
-        <section style={{ padding: "96px 0", background: "var(--ch-ink)", color: "#D7CFC0" }}>
-          <div className="mx-auto" style={{ maxWidth: 640, padding: "0 40px", textAlign: "center" }}>
-            <span className="ch-eyebrow" style={{ color: "var(--ch-accent-soft)" }}>— Join the list</span>
-            <h2 className="ch-display" style={{ fontSize: 48, lineHeight: 1, margin: "12px 0 16px", color: "#fff" }}>
-              10% off your first order.
-            </h2>
-            <p style={{ fontSize: 15, color: "#B8AE9C", margin: "0 0 32px" }}>
-              First-look drops, restock alerts, and the very occasional editorial. No spam, ever.
-            </p>
-            {newsletterSent ? (
-              <p style={{ background: "rgba(108,124,94,0.2)", border: "1px solid var(--ch-accent)", borderRadius: 8, padding: "14px 20px", fontSize: 14, color: "var(--ch-accent-soft)", maxWidth: 400, margin: "0 auto" }}>
-                ✓ You're subscribed. Check your inbox for your code.
-              </p>
-            ) : (
-              <form onSubmit={submitNewsletter} style={{ display: "flex", gap: 10, maxWidth: 460, margin: "0 auto" }}>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Your email address"
-                  style={{ flex: 1, background: "transparent", border: 0, borderBottom: "1px solid #4a443a", padding: "10px 0", color: "#fff", outline: "none", fontSize: 14 }}
-                />
-                <button type="submit" style={{ background: "var(--ch-bg)", color: "var(--ch-ink)", border: 0, padding: "12px 22px", borderRadius: 999, fontWeight: 600, fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
-                  Subscribe
-                </button>
-              </form>
-            )}
+        {/* Product grid */}
+        {shelfProducts.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "64px 0", color: "var(--co-ink-3)", fontFamily: "var(--co-serif)", fontSize: 28 }}>
+            The shelf is being stocked — check back soon.
           </div>
-        </section>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }}>
+            {shelfProducts.map((p, idx) => (
+              <CheckoutrCard key={p.id} product={p} index={idx} onAdd={() => handleAdd(p)} grid />
+            ))}
+          </div>
+        )}
+
+        {products.length > 0 && (
+          <div style={{ textAlign: "center", marginTop: 48 }}>
+            <Link to="/shop" style={{ fontSize: 14, fontWeight: 600, color: "var(--co-ink)", textDecoration: "underline", textUnderlineOffset: 4 }}>
+              Browse all {products.length} products →
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* NEWSLETTER (inside page, above footer) */}
+      <div style={{ background: "var(--co-bg)", borderTop: "1px solid var(--co-hair)", padding: "56px 40px" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 32, height: 32, background: "var(--co-yellow)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>✓</div>
+            <span style={{ fontFamily: "var(--co-serif)", fontSize: 20, fontStyle: "italic" }}>{company_name}</span>
+          </div>
+          <p style={{ fontSize: 13, color: "var(--co-ink-2)", marginBottom: 20, lineHeight: 1.55 }}>
+            Gear that actually works, at prices that don't insult you. Get £10 off your first order.
+          </p>
+          {newsletterSent ? (
+            <p style={{ fontSize: 13, color: "green", fontWeight: 600 }}>✓ You're in! Check your inbox for the code.</p>
+          ) : (
+            <form onSubmit={submitNewsletter} style={{ display: "flex", gap: 10 }}>
+              <input
+                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="Your email"
+                style={{ flex: 1, border: "1px solid var(--co-hair)", borderRadius: 999, padding: "12px 18px", fontSize: 13, outline: "none", background: "var(--co-surface)", color: "var(--co-ink)" }}
+              />
+              <button type="submit" className="co-pill-btn yellow" style={{ fontSize: 13, padding: "12px 20px" }}>
+                Get £10 off
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </SiteLayout>
   );
 }
 
-function EditorialProductCard({ product, index, onAdd }: { product: Product; index: number; onAdd: () => void }) {
-  const bgTints = ["#F4EFE7", "#E8DDD0", "#DDE3D2", "#F0E5D6", "#E4DAC8", "#EDE4D2", "#E1E8D9", "#EFE2D5"];
-  const bg = bgTints[index % bgTints.length];
-  const showSale = Number(product.price_1) > Number(product.price_2) && Number(product.price_2) > 0;
-  const badge = index === 0 ? "Best seller" : index === 1 ? "New" : showSale ? `−${Math.round((1 - Number(product.price_2) / Number(product.price_1)) * 100)}%` : null;
-  const badgeBg = badge === "New" ? "var(--ch-accent)" : badge?.startsWith("−") ? "var(--ch-sale)" : "var(--ch-ink)";
+function CheckoutrCard({ product, index, onAdd, grid }: { product: Product | null; index: number; onAdd: () => void; grid?: boolean }) {
+  const bg = CARD_PASTELS[index % CARD_PASTELS.length];
+  const showSale = product && Number(product.price_1) > Number(product.price_2) && Number(product.price_2) > 0;
+  const discountPct = showSale ? Math.round((1 - Number(product!.price_2) / Number(product!.price_1)) * 100) : 0;
+
+  const cardStyle: React.CSSProperties = grid
+    ? { display: "flex", flexDirection: "column", borderRadius: 20, overflow: "hidden", background: "var(--co-surface)", border: "1px solid var(--co-hair)" }
+    : { flexShrink: 0, width: 300, display: "flex", flexDirection: "column", borderRadius: 20, overflow: "hidden", scrollSnapAlign: "start" };
 
   return (
-    <div className="ch-product" style={{ position: "relative" }}>
-      <div className="ch-img-wrap" style={{ position: "relative", aspectRatio: "1 / 1.1", background: bg, borderRadius: 14, overflow: "hidden", marginBottom: 18, transition: "transform .3s ease" }}>
-        {badge && (
-          <span style={{ position: "absolute", top: 14, left: 14, background: badgeBg, color: "#fff", padding: "5px 10px", borderRadius: 999, fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 600, zIndex: 2 }}>
-            {badge}
+    <div className="co-card" style={cardStyle}>
+      {/* Image area */}
+      <div style={{ position: "relative", background: bg, aspectRatio: grid ? "1 / 1.1" : "1 / 1.4", overflow: "hidden" }}>
+        {/* Category tag */}
+        {product && (
+          <span style={{ position: "absolute", top: 14, left: 14, fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--co-ink-2)", zIndex: 2 }}>
+            {product.subdomain?.replace(/-/g, " ").toUpperCase() || "PRODUCT"}
           </span>
         )}
-        <button aria-label="Save" style={{ position: "absolute", top: 14, right: 14, width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.9)", border: "1px solid var(--ch-hair)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ch-ink-2)", zIndex: 2, cursor: "pointer" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M12 21s-7-4.5-9.3-9.1C1 9.4 2.3 5.5 6 5c2-.2 3.7.7 6 3 2.3-2.3 4-3.2 6-3 3.7.5 5 4.4 3.3 6.9C19 16.5 12 21 12 21z" />
-          </svg>
-        </button>
-        {product.image_url ? (
-          <img src={product.image_url} alt={product.product_name}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        {/* Discount badge */}
+        {showSale && discountPct > 0 && (
+          <span style={{ position: "absolute", top: 14, right: 14, background: "#1A1A1A", color: "#fff", borderRadius: 999, padding: "5px 10px", fontSize: 11, fontWeight: 700, zIndex: 2 }}>
+            -{discountPct}%
+          </span>
+        )}
+        {/* Product image or placeholder icon */}
+        {product?.image_url ? (
+          <img src={product.image_url} alt={product.product_name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", padding: 20 }} />
         ) : (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--ch-serif)", fontSize: 64, color: "var(--ch-ink-3)" }}>
-            {product.product_name.slice(0, 2).toUpperCase()}
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#1A1A1A" strokeWidth="1.5" opacity={0.35}>
+              <rect x="8" y="8" width="48" height="48" rx="8" />
+              <circle cx="32" cy="32" r="10" />
+              <line x1="32" y1="8" x2="32" y2="22" />
+              <line x1="32" y1="42" x2="32" y2="56" />
+            </svg>
           </div>
         )}
-        <button onClick={onAdd} className="ch-add" style={{ position: "absolute", left: 14, right: 14, bottom: 14, padding: "12px 14px", background: "var(--ch-ink)", color: "#fff", border: 0, borderRadius: 999, fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", opacity: 0, transform: "translateY(8px)", transition: "opacity .25s ease, transform .25s ease", zIndex: 2, cursor: "pointer" }}>
-          Add to bag · £{Number(product.price_2).toFixed(0)}
-        </button>
+        {/* Hover add button */}
+        {product && (
+          <button
+            className="co-checkout-btn"
+            onClick={(e) => { e.preventDefault(); onAdd(); }}
+            style={{ position: "absolute", left: 12, right: 12, bottom: 12, background: "var(--co-yellow)", color: "var(--co-ink)", border: "none", borderRadius: 12, padding: "13px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: 0, transform: "translateY(6px)", transition: "opacity .22s, transform .22s", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3 }}
+          >
+            <span>Add to checkout</span>
+            <span>→</span>
+          </button>
+        )}
       </div>
-      <Link to="/products/$subdomain" params={{ subdomain: product.subdomain }} style={{ color: "inherit" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 11, color: "var(--ch-ink-3)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
-          <span>{product.subdomain}</span>
-          <span>★ 4.8</span>
-        </div>
-        <h3 className="ch-display" style={{ fontSize: 22, lineHeight: 1.15, margin: "0 0 6px" }}>{product.product_name}</h3>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>
-            {showSale && <span style={{ color: "var(--ch-ink-3)", textDecoration: "line-through", fontWeight: 400, marginRight: 6 }}>£{Number(product.price_1).toFixed(2)}</span>}
-            £{Number(product.price_2).toFixed(2)}
-          </div>
-        </div>
-      </Link>
+
+      {/* Info */}
+      <div style={{ padding: "16px 16px 8px" }}>
+        {product ? (
+          <Link to="/products/$subdomain" params={{ subdomain: product.subdomain }} style={{ color: "inherit", textDecoration: "none" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 6px", lineHeight: 1.3, color: "var(--co-ink)" }}>{product.product_name}</h3>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+              <span style={{ fontWeight: 700 }}>£{Number(product.price_2).toFixed(2)}</span>
+              {showSale && <span style={{ textDecoration: "line-through", color: "var(--co-ink-3)", fontSize: 12 }}>£{Number(product.price_1).toFixed(2)}</span>}
+            </div>
+          </Link>
+        ) : (
+          <div style={{ height: 40, background: "var(--co-hair)", borderRadius: 6, opacity: 0.5 }} />
+        )}
+      </div>
+
+      {/* Yellow checkout button (always visible below card) */}
+      {product && (
+        <button
+          onClick={onAdd}
+          style={{ margin: "8px 12px 14px", background: "var(--co-yellow)", color: "var(--co-ink)", border: "none", borderRadius: 12, padding: "13px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
+          <span>Add to checkout</span>
+          <span>→</span>
+        </button>
+      )}
     </div>
   );
 }
